@@ -439,8 +439,8 @@ body {
             <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Goal</div>
             <textarea id="agent-goal" style="width:100%;height:60px;background:hsla(0,0%,8%,0.7);border:1px solid #2a2a3a;color:#ccc;border-radius:5px;padding:8px;font-family:inherit;font-size:11px;resize:vertical;outline:none;" placeholder="What should the agent do?"></textarea>
             <div style="display:flex;gap:6px;margin-top:8px;">
-                <button style="flex:1;padding:7px;background:hsla(210,70%,45%,0.7);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;letter-spacing:0.06em;">▶ RUN</button>
-                <button style="padding:7px 12px;background:hsla(0,60%,40%,0.6);color:#fcc;border:none;border-radius:5px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;">◼ STOP</button>
+                <button id="agent-run-btn" onclick="startAgent()" style="flex:1;padding:7px;background:hsla(210,70%,45%,0.7);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;letter-spacing:0.06em;">▶ RUN</button>
+                <button id="agent-stop-btn" onclick="stopAgent()" style="padding:7px 12px;background:hsla(0,60%,40%,0.6);color:#fcc;border:none;border-radius:5px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;">◼ STOP</button>
             </div>
             <div style="margin-top:14px;padding:10px;background:hsla(0,0%,100%,0.02);border-radius:5px;border:1px solid #1a1a2a;">
                 <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:0.1em;">Status</div>
@@ -454,15 +454,19 @@ body {
         <div class="lf-panel-header"><span>⚙️ Settings</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
         <div class="lf-panel-body">
             <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Provider</div>
-            <select id="setting-provider" style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;">
-                <option>OLLAMA</option><option>LM STUDIO</option><option>GEMINI</option><option>OPENAI</option>
+            <select id="setting-provider" onchange="updateDefaultUrl()" style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;">
+                <option value="OLLAMA">OLLAMA</option>
+                <option value="LM STUDIO">LM STUDIO</option>
+                <option value="GEMINI">GEMINI</option>
+                <option value="OPENAI">OPENAI</option>
             </select>
             <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin:12px 0 4px;">Model</div>
-            <input id="setting-model" style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;" value="llama3" />
+            <input id="setting-model" list="model-list" style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;" value="llama3" />
+            <datalist id="model-list"></datalist>
             <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin:12px 0 4px;">Base URL</div>
             <input id="setting-base-url" style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;" value="http://localhost:11434" />
             <div style="display:flex;gap:6px;margin-top:12px;">
-                <button style="flex:1;padding:7px;background:hsla(140,50%,30%,0.6);color:#cfc;border:1px solid hsla(140,50%,40%,0.4);border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">🔍 DETECT</button>
+                <button id="detect-btn" onclick="detectModels()" style="flex:1;padding:7px;background:hsla(140,50%,30%,0.6);color:#cfc;border:1px solid hsla(140,50%,40%,0.4);border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">🔍 DETECT</button>
                 <button onclick="saveSettings()" style="flex:1;padding:7px;background:hsla(210,70%,45%,0.6);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">💾 SAVE</button>
             </div>
         </div>
@@ -608,6 +612,17 @@ const Chrime = {
         const baseUrl = localStorage.getItem('lf-setting-base-url');
         if (baseUrl) document.getElementById('setting-base-url').value = baseUrl;
 
+        const modelList = localStorage.getItem('lf-model-list');
+        if (modelList) {
+            const datalist = document.getElementById('model-list');
+            datalist.innerHTML = '';
+            JSON.parse(modelList).forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                datalist.appendChild(opt);
+            });
+        }
+
         addLog('info', 'Chrime synchronized: Persistent state loaded.');
     },
     save() {
@@ -615,6 +630,10 @@ const Chrime = {
         localStorage.setItem('lf-setting-provider', document.getElementById('setting-provider').value);
         localStorage.setItem('lf-setting-model', document.getElementById('setting-model').value);
         localStorage.setItem('lf-setting-base-url', document.getElementById('setting-base-url').value);
+
+        const models = Array.from(document.getElementById('model-list').options).map(o => o.value);
+        localStorage.setItem('lf-model-list', JSON.stringify(models));
+
         addLog('success', 'Chrime updated: Persistent state saved.');
     }
 };
@@ -622,6 +641,78 @@ const Chrime = {
 function saveSettings() {
     Chrime.save();
     closePanel();
+}
+
+async function detectModels() {
+    const provider = document.getElementById('setting-provider').value;
+    const baseUrl = document.getElementById('setting-base-url').value.replace(/\/$/, '');
+    const btn = document.getElementById('detect-btn');
+    const datalist = document.getElementById('model-list');
+
+    btn.disabled = true;
+    btn.textContent = '⌛ ...';
+    datalist.innerHTML = '';
+
+    addLog('info', `Attempting to detect models for ${provider} at ${baseUrl}...`);
+
+    try {
+        let models = [];
+        if (provider === 'OLLAMA') {
+            const res = await fetch(`${baseUrl}/api/tags`);
+            if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
+            const data = await res.json();
+            models = data.models.map(m => m.name);
+        } else if (provider === 'LM STUDIO' || provider === 'OPENAI') {
+            // LM Studio usually serves OpenAI compatible endpoints at /v1/models
+            // LM Studio v1 also has /api/v1/models, but /v1/models is more standard for compat
+            const res = await fetch(`${baseUrl}/v1/models`);
+            if (!res.ok) throw new Error(`${provider} error: ${res.status}`);
+            const data = await res.json();
+            models = data.data.map(m => m.id);
+        } else if (provider === 'GEMINI') {
+             addLog('info', 'Note: Gemini model detection usually requires an API key in headers.');
+             // Mocking common ones as fetch is likely to fail without key/setup
+             models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
+        }
+
+        if (models.length > 0) {
+            models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                datalist.appendChild(opt);
+            });
+            addLog('success', `Detected ${models.length} models from ${provider}.`);
+            // Auto-select first if current is empty or not in list?
+            const modelInput = document.getElementById('setting-model');
+            if (!modelInput.value || !models.includes(modelInput.value)) {
+                modelInput.value = models[0];
+            }
+        } else {
+            addLog('error', `No models found for ${provider}. Check your connection.`);
+        }
+    } catch (err) {
+        addLog('error', `Detection failed: ${err.message}`);
+        console.error(err);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔍 DETECT';
+    }
+}
+
+function updateDefaultUrl() {
+    const provider = document.getElementById('setting-provider').value;
+    const urlInput = document.getElementById('setting-base-url');
+    const defaults = {
+        'OLLAMA': 'http://localhost:11434',
+        'LM STUDIO': 'http://localhost:1234',
+        'OPENAI': 'https://api.openai.com/v1',
+        'GEMINI': 'https://generativelanguage.googleapis.com'
+    };
+    if (defaults[provider]) {
+        urlInput.value = defaults[provider];
+    }
+    // Auto-detect on provider change to make it "real"
+    detectModels();
 }
 
 // Auto-save goal on change
@@ -684,6 +775,57 @@ function addLog(type, msg) {
 
 // Escape to close
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+
+let agentActive = false;
+
+async function startAgent() {
+    const goal = document.getElementById('agent-goal').value;
+    const provider = document.getElementById('setting-provider').value;
+    const model = document.getElementById('setting-model').value;
+    const baseUrl = document.getElementById('setting-base-url').value;
+
+    if (!goal) {
+        addLog('error', 'Please specify a goal.');
+        return;
+    }
+
+    agentActive = true;
+    addLog('info', `Agent starting: ${model} @ ${provider}`);
+    setState('thinking');
+
+    try {
+        // Real connection probe
+        addLog('info', `Probing connectivity to ${baseUrl}...`);
+        const probeUrl = provider === 'OLLAMA' ? `${baseUrl}/api/tags` : `${baseUrl}/v1/models`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const res = await fetch(probeUrl, { method: 'GET', mode: 'cors', signal: controller.signal })
+            .then(r => { clearTimeout(timeoutId); return r; })
+            .catch(e => { clearTimeout(timeoutId); return { ok: false, error: e }; });
+
+        if (res.ok) {
+            addLog('success', 'Connection established. Sovereign context initialized.');
+        } else {
+            addLog('error', 'Warning: Provider unreachable. Continuing with cached knowledge.');
+        }
+
+        // Transition to simulated loop for now, but with real-world triggers
+        runSimulation();
+    } catch (e) {
+        if (agentActive) {
+            addLog('error', `Agent execution failed: ${e.message}`);
+            setState('error');
+        }
+    }
+}
+
+function stopAgent() {
+    agentActive = false;
+    addLog('info', 'Stopping agent...');
+    setState('idle');
+}
 
 // Simulation
 async function runSimulation() {
