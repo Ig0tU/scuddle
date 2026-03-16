@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liquid Laser Frame — Interactive Demo</title>
+<style>
+/* ── @property registrations for smooth hue animation ── */
+@property --lf-hue-1 { syntax: "<number>"; inherits: true; initial-value: 220; }
+@property --lf-hue-2 { syntax: "<number>"; inherits: true; initial-value: 260; }
+@property --lf-hue-3 { syntax: "<number>"; inherits: true; initial-value: 200; }
+@property --lf-intensity { syntax: "<number>"; inherits: true; initial-value: 0.55; }
+@property --lf-glow-opacity { syntax: "<number>"; inherits: true; initial-value: 0.4; }
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #0a0a0f;
+    color: #c8cad0;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+    overflow: hidden;
+    width: 100vw; height: 100vh;
+}
+
+/* ── Frame Root ── */
+#lf-root {
+    position: fixed; top: 0; left: 0;
+    width: 0; height: 0;
+    overflow: visible;
+    z-index: 999;
+    pointer-events: none;
+    transition:
+        --lf-hue-1 0.9s ease-in-out,
+        --lf-hue-2 0.9s ease-in-out,
+        --lf-hue-3 0.9s ease-in-out,
+        --lf-intensity 0.6s ease-in-out,
+        --lf-glow-opacity 0.6s ease-in-out;
+}
+
+/* ── State Definitions ── */
+#lf-root[data-state="idle"] {
+    --lf-hue-1: 220; --lf-hue-2: 260; --lf-hue-3: 200;
+    --lf-intensity: 0.45; --lf-glow-opacity: 0.3;
+    --lf-flow-speed: 6s;
+}
+#lf-root[data-state="thinking"] {
+    --lf-hue-1: 35; --lf-hue-2: 50; --lf-hue-3: 25;
+    --lf-intensity: 0.82; --lf-glow-opacity: 0.55;
+    --lf-flow-speed: 3s;
+}
+#lf-root[data-state="acting"] {
+    --lf-hue-1: 180; --lf-hue-2: 200; --lf-hue-3: 170;
+    --lf-intensity: 0.88; --lf-glow-opacity: 0.6;
+    --lf-flow-speed: 2s;
+}
+#lf-root[data-state="error"] {
+    --lf-hue-1: 0; --lf-hue-2: 350; --lf-hue-3: 15;
+    --lf-intensity: 0.95; --lf-glow-opacity: 0.7;
+    --lf-flow-speed: 1.5s;
+}
+#lf-root[data-state="success"] {
+    --lf-hue-1: 140; --lf-hue-2: 160; --lf-hue-3: 120;
+    --lf-intensity: 0.8; --lf-glow-opacity: 0.5;
+    --lf-flow-speed: 4s;
+}
+#lf-root[data-state="waiting"] {
+    --lf-hue-1: 270; --lf-hue-2: 290; --lf-hue-3: 250;
+    --lf-intensity: 0.55; --lf-glow-opacity: 0.4;
+    --lf-flow-speed: 8s;
+}
+
+/* ── Pulse/Breathe per state ── */
+#lf-root[data-state="thinking"] .lf-edge { animation: lf-edge-pulse 1.8s ease-in-out infinite alternate, var(--edge-flow-anim); }
+#lf-root[data-state="error"] .lf-edge    { animation: lf-edge-pulse 1.2s ease-in-out infinite alternate, var(--edge-flow-anim); }
+#lf-root[data-state="waiting"] .lf-edge  { animation: lf-edge-breathe 3s ease-in-out infinite, var(--edge-flow-anim); }
+
+@keyframes lf-edge-pulse {
+    0%   { filter: brightness(1) blur(0.3px); }
+    100% { filter: brightness(1.6) blur(0.7px); }
+}
+@keyframes lf-edge-breathe {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 0.85; }
+}
+
+/* ── Frame Edges ── */
+.lf-edge {
+    position: fixed;
+    z-index: 1000;
+    pointer-events: none;
+    will-change: transform, opacity;
+    transform: translateZ(0);
+}
+
+.lf-edge-top {
+    top: 0; left: 0; right: 0; height: 5px;
+    background: linear-gradient(90deg,
+        hsla(var(--lf-hue-1), 90%, 55%, 0) 0%,
+        hsla(var(--lf-hue-1), 90%, 55%, var(--lf-intensity)) 8%,
+        hsla(var(--lf-hue-2), 85%, 60%, var(--lf-intensity)) 25%,
+        hsla(var(--lf-hue-3), 90%, 50%, var(--lf-intensity)) 42%,
+        hsla(var(--lf-hue-1), 88%, 62%, var(--lf-intensity)) 58%,
+        hsla(var(--lf-hue-2), 92%, 55%, var(--lf-intensity)) 75%,
+        hsla(var(--lf-hue-3), 85%, 58%, var(--lf-intensity)) 92%,
+        hsla(var(--lf-hue-1), 90%, 55%, 0) 100%
+    );
+    background-size: 400% 100%;
+    --edge-flow-anim: lf-flow-h var(--lf-flow-speed, 6s) linear infinite;
+    animation: lf-flow-h var(--lf-flow-speed, 6s) linear infinite;
+    box-shadow:
+        0 0 16px hsla(var(--lf-hue-2), 85%, 55%, var(--lf-glow-opacity)),
+        0 2px 8px hsla(var(--lf-hue-1), 90%, 50%, calc(var(--lf-glow-opacity) * 0.5)),
+        inset 0 0 3px hsla(var(--lf-hue-3), 90%, 70%, 0.3);
+}
+.lf-edge-bottom {
+    bottom: 0; left: 0; right: 0; height: 5px;
+    background: linear-gradient(90deg,
+        hsla(var(--lf-hue-3), 90%, 55%, 0) 0%,
+        hsla(var(--lf-hue-3), 90%, 55%, var(--lf-intensity)) 8%,
+        hsla(var(--lf-hue-1), 85%, 60%, var(--lf-intensity)) 25%,
+        hsla(var(--lf-hue-2), 90%, 50%, var(--lf-intensity)) 42%,
+        hsla(var(--lf-hue-3), 88%, 62%, var(--lf-intensity)) 58%,
+        hsla(var(--lf-hue-1), 92%, 55%, var(--lf-intensity)) 75%,
+        hsla(var(--lf-hue-2), 85%, 58%, var(--lf-intensity)) 92%,
+        hsla(var(--lf-hue-3), 90%, 55%, 0) 100%
+    );
+    background-size: 400% 100%;
+    --edge-flow-anim: lf-flow-h-rev var(--lf-flow-speed, 6s) linear infinite;
+    animation: lf-flow-h-rev var(--lf-flow-speed, 6s) linear infinite;
+    box-shadow:
+        0 0 16px hsla(var(--lf-hue-1), 85%, 55%, var(--lf-glow-opacity)),
+        0 -2px 8px hsla(var(--lf-hue-2), 90%, 50%, calc(var(--lf-glow-opacity) * 0.5)),
+        inset 0 0 3px hsla(var(--lf-hue-1), 90%, 70%, 0.3);
+}
+.lf-edge-left {
+    top: 5px; bottom: 5px; left: 0; width: 5px;
+    background: linear-gradient(180deg,
+        hsla(var(--lf-hue-2), 90%, 55%, 0) 0%,
+        hsla(var(--lf-hue-2), 90%, 55%, var(--lf-intensity)) 6%,
+        hsla(var(--lf-hue-3), 85%, 60%, var(--lf-intensity)) 25%,
+        hsla(var(--lf-hue-1), 90%, 50%, var(--lf-intensity)) 42%,
+        hsla(var(--lf-hue-2), 88%, 62%, var(--lf-intensity)) 58%,
+        hsla(var(--lf-hue-3), 92%, 55%, var(--lf-intensity)) 75%,
+        hsla(var(--lf-hue-1), 85%, 58%, var(--lf-intensity)) 92%,
+        hsla(var(--lf-hue-2), 90%, 55%, 0) 100%
+    );
+    background-size: 100% 400%;
+    --edge-flow-anim: lf-flow-v var(--lf-flow-speed, 6s) linear infinite;
+    animation: lf-flow-v var(--lf-flow-speed, 6s) linear infinite;
+    box-shadow:
+        0 0 16px hsla(var(--lf-hue-3), 85%, 55%, var(--lf-glow-opacity)),
+        2px 0 8px hsla(var(--lf-hue-2), 90%, 50%, calc(var(--lf-glow-opacity) * 0.5)),
+        inset 0 0 3px hsla(var(--lf-hue-1), 90%, 70%, 0.3);
+}
+.lf-edge-right {
+    top: 5px; bottom: 5px; right: 0; width: 5px;
+    background: linear-gradient(180deg,
+        hsla(var(--lf-hue-1), 90%, 55%, 0) 0%,
+        hsla(var(--lf-hue-1), 90%, 55%, var(--lf-intensity)) 6%,
+        hsla(var(--lf-hue-2), 85%, 60%, var(--lf-intensity)) 25%,
+        hsla(var(--lf-hue-3), 90%, 50%, var(--lf-intensity)) 42%,
+        hsla(var(--lf-hue-1), 88%, 62%, var(--lf-intensity)) 58%,
+        hsla(var(--lf-hue-2), 92%, 55%, var(--lf-intensity)) 75%,
+        hsla(var(--lf-hue-3), 85%, 58%, var(--lf-intensity)) 92%,
+        hsla(var(--lf-hue-1), 90%, 55%, 0) 100%
+    );
+    background-size: 100% 400%;
+    --edge-flow-anim: lf-flow-v-rev var(--lf-flow-speed, 6s) linear infinite;
+    animation: lf-flow-v-rev var(--lf-flow-speed, 6s) linear infinite;
+    box-shadow:
+        0 0 16px hsla(var(--lf-hue-1), 85%, 55%, var(--lf-glow-opacity)),
+        -2px 0 8px hsla(var(--lf-hue-3), 90%, 50%, calc(var(--lf-glow-opacity) * 0.5)),
+        inset 0 0 3px hsla(var(--lf-hue-2), 90%, 70%, 0.3);
+}
+
+@keyframes lf-flow-h     { 0% { background-position: 0% 50%; }   100% { background-position: 400% 50%; } }
+@keyframes lf-flow-h-rev { 0% { background-position: 400% 50%; } 100% { background-position: 0% 50%; } }
+@keyframes lf-flow-v     { 0% { background-position: 50% 0%; }   100% { background-position: 50% 400%; } }
+@keyframes lf-flow-v-rev { 0% { background-position: 50% 400%; } 100% { background-position: 50% 0%; } }
+
+/* ── Corner Nodes ── */
+.lf-corner {
+    position: fixed; width: 9px; height: 9px;
+    border-radius: 50%; z-index: 1002; pointer-events: none;
+    background: radial-gradient(circle,
+        hsla(var(--lf-hue-2), 95%, 75%, 0.9),
+        hsla(var(--lf-hue-1), 85%, 55%, 0) 70%
+    );
+    filter: blur(0.8px);
+    animation: lf-corner-pulse 2.5s ease-in-out infinite alternate;
+}
+.lf-corner-tl { top: 0; left: 0; }
+.lf-corner-tr { top: 0; right: 0; }
+.lf-corner-bl { bottom: 0; left: 0; }
+.lf-corner-br { bottom: 0; right: 0; }
+@keyframes lf-corner-pulse {
+    0%   { opacity: 0.5; transform: scale(1); }
+    100% { opacity: 1;   transform: scale(1.4); }
+}
+
+/* ── Tab Containers ── */
+.lf-tabs { position: absolute; display: flex; gap: 3px; z-index: 1003; pointer-events: none; }
+.lf-tabs-top    { top: 100%; left: 50%; transform: translateX(-50%); flex-direction: row; }
+.lf-tabs-left   { left: 100%; top: 50%; transform: translateY(-50%); flex-direction: column; }
+.lf-tabs-right  { right: 100%; top: 50%; transform: translateY(-50%); flex-direction: column; }
+.lf-tabs-bottom { bottom: 100%; left: 50%; transform: translateX(-50%); flex-direction: row; }
+
+/* ── Individual Tab ── */
+.lf-tab {
+    pointer-events: auto; cursor: pointer;
+    background: hsla(var(--lf-hue-1), 50%, 10%, 0.88);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid hsla(var(--lf-hue-2), 70%, 45%, 0.35);
+    color: hsla(var(--lf-hue-2), 60%, 78%, 0.9);
+    font-size: 9px; font-family: inherit;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 4px;
+    transition: background 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.2s;
+    user-select: none;
+}
+.lf-tabs-top .lf-tab    { padding: 5px 10px; border-radius: 0 0 6px 6px; border-top: none; }
+.lf-tabs-bottom .lf-tab { padding: 5px 10px; border-radius: 6px 6px 0 0; border-bottom: none; }
+.lf-tabs-left .lf-tab   { padding: 10px 5px; border-radius: 0 6px 6px 0; border-left: none; writing-mode: vertical-rl; text-orientation: mixed; flex-direction: column; }
+.lf-tabs-right .lf-tab  { padding: 10px 5px; border-radius: 6px 0 0 6px; border-right: none; writing-mode: vertical-rl; text-orientation: mixed; flex-direction: column; }
+
+.lf-tab:hover {
+    background: hsla(var(--lf-hue-1), 55%, 16%, 0.95);
+    border-color: hsla(var(--lf-hue-2), 80%, 55%, 0.6);
+    box-shadow: 0 0 10px hsla(var(--lf-hue-2), 85%, 55%, 0.4), inset 0 0 5px hsla(var(--lf-hue-2), 85%, 55%, 0.15);
+    transform: scale(1.05);
+}
+.lf-tab.active {
+    background: hsla(var(--lf-hue-2), 55%, 18%, 0.95);
+    border-color: hsla(var(--lf-hue-2), 90%, 60%, 0.7);
+    box-shadow: 0 0 14px hsla(var(--lf-hue-2), 90%, 55%, 0.55);
+    color: hsla(var(--lf-hue-2), 80%, 90%, 1);
+}
+.lf-tab-icon { font-size: 12px; line-height: 1; }
+
+/* ── Status Pill ── */
+.lf-status-pill {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 1003; pointer-events: none;
+    padding: 3px 14px; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: hsla(var(--lf-hue-2), 70%, 82%, 0.9);
+    background: hsla(var(--lf-hue-1), 40%, 8%, 0.8);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid hsla(var(--lf-hue-2), 60%, 45%, 0.3);
+    border-radius: 12px;
+    opacity: 0; transition: opacity 0.4s ease;
+}
+.lf-status-pill.visible { opacity: 1; }
+
+/* ── Panels ── */
+.lf-panel {
+    position: fixed; z-index: 1001; pointer-events: none;
+    background: hsla(var(--lf-hue-1), 30%, 6%, 0.94);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid hsla(var(--lf-hue-2), 55%, 35%, 0.3);
+    box-shadow: 0 0 40px hsla(var(--lf-hue-1), 70%, 25%, 0.25), inset 0 1px 0 hsla(var(--lf-hue-2), 70%, 55%, 0.08);
+    color: #c8cad0; font-size: 12px;
+    overflow: hidden; display: flex; flex-direction: column;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease, visibility 0s linear 0.35s;
+    opacity: 0; visibility: hidden;
+}
+.lf-panel.open {
+    pointer-events: auto; opacity: 1; visibility: visible;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease, visibility 0s linear 0s;
+}
+
+.lf-panel-left {
+    top: 14px; left: 10px; bottom: 14px; width: 320px; max-width: 36vw;
+    border-radius: 0 10px 10px 0; transform: translateX(-110%);
+}
+.lf-panel-left.open { transform: translateX(0); }
+
+.lf-panel-right {
+    top: 14px; right: 10px; bottom: 14px; width: 320px; max-width: 36vw;
+    border-radius: 10px 0 0 10px; transform: translateX(110%);
+}
+.lf-panel-right.open { transform: translateX(0); }
+
+.lf-panel-bottom {
+    left: 14px; right: 14px; bottom: 10px; height: 240px; max-height: 35vh;
+    border-radius: 10px 10px 0 0; transform: translateY(110%);
+}
+.lf-panel-bottom.open { transform: translateY(0); }
+
+.lf-panel-header {
+    padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid hsla(var(--lf-hue-2), 50%, 35%, 0.2);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: hsla(var(--lf-hue-2), 60%, 80%, 0.9); flex-shrink: 0;
+}
+.lf-panel-close {
+    cursor: pointer; font-size: 16px; color: #888; background: none; border: none;
+    padding: 0 4px; line-height: 1; transition: color 0.2s; font-family: inherit;
+}
+.lf-panel-close:hover { color: #fff; }
+.lf-panel-body { flex: 1; overflow-y: auto; padding: 14px; scrollbar-width: thin; }
+
+/* ── Demo Page Content ── */
+.demo-content {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100vh; padding: 40px;
+    text-align: center;
+}
+.demo-title {
+    font-size: 28px; font-weight: 700; letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #667eea, #764ba2, #f093fb);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 8px;
+}
+.demo-subtitle {
+    font-size: 13px; color: #555; letter-spacing: 0.05em; margin-bottom: 32px;
+}
+
+/* ── State Switcher ── */
+.state-grid {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 24px;
+}
+.state-btn {
+    padding: 10px 18px; border: 1px solid #333; border-radius: 8px;
+    background: hsla(0, 0%, 10%, 0.8); color: #aaa; font-family: inherit;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.25s ease; user-select: none;
+}
+.state-btn:hover { background: hsla(0, 0%, 15%, 0.9); border-color: #555; color: #ddd; }
+.state-btn.active { border-color: #888; color: #fff; box-shadow: 0 0 12px hsla(0, 0%, 50%, 0.2); }
+.state-btn[data-state="idle"]     { --accent: 220; }
+.state-btn[data-state="thinking"] { --accent: 40; }
+.state-btn[data-state="acting"]   { --accent: 190; }
+.state-btn[data-state="error"]    { --accent: 0; }
+.state-btn[data-state="success"]  { --accent: 140; }
+.state-btn[data-state="waiting"]  { --accent: 270; }
+.state-btn.active {
+    border-color: hsl(var(--accent), 70%, 55%);
+    color: hsl(var(--accent), 70%, 80%);
+    box-shadow: 0 0 16px hsla(var(--accent), 80%, 50%, 0.3);
+    background: hsla(var(--accent), 40%, 12%, 0.9);
+}
+
+.demo-hint {
+    font-size: 10px; color: #444; margin-top: 16px; letter-spacing: 0.05em;
+}
+.demo-note {
+    max-width: 540px; margin: 20px auto 0; font-size: 11px; color: #3a3a4a;
+    line-height: 1.7; text-align: left; padding: 16px;
+    background: hsla(0, 0%, 8%, 0.6); border: 1px solid #1a1a2a; border-radius: 8px;
+}
+.demo-note strong { color: #667eea; }
+
+/* ── Simulation Timeline ── */
+.sim-section {
+    margin-top: 20px; display: flex; gap: 8px; align-items: center;
+}
+.sim-btn {
+    padding: 8px 16px; border: 1px solid #444; border-radius: 6px;
+    background: linear-gradient(135deg, hsla(210, 60%, 20%, 0.8), hsla(270, 40%, 18%, 0.8));
+    color: #aac; font-family: inherit; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.2s;
+}
+.sim-btn:hover {
+    border-color: #667eea; box-shadow: 0 0 12px hsla(240, 70%, 55%, 0.3);
+    color: #ddf;
+}
+.sim-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.sim-progress {
+    font-size: 10px; color: #555; min-width: 120px;
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════ LIQUID LASER FRAME ════════════════ -->
+<div id="lf-root" data-state="idle">
+    <!-- Edges -->
+    <div class="lf-edge lf-edge-top" id="edge-top">
+        <div class="lf-tabs lf-tabs-top">
+            <div class="lf-tab" data-panel="agent" onclick="togglePanel('agent')"><span class="lf-tab-icon">🤖</span><span>Agent</span></div>
+            <div class="lf-tab" data-panel="workflows" onclick="togglePanel('workflows')"><span class="lf-tab-icon">🔄</span><span>Flows</span></div>
+        </div>
+    </div>
+    <div class="lf-edge lf-edge-right" id="edge-right">
+        <div class="lf-tabs lf-tabs-right">
+            <div class="lf-tab" data-panel="tools" onclick="togglePanel('tools')"><span class="lf-tab-icon">🧰</span><span>Tools</span></div>
+            <div class="lf-tab" data-panel="canvas" onclick="togglePanel('canvas')"><span class="lf-tab-icon">📱</span><span>Canvas</span></div>
+            <div class="lf-tab" data-panel="mcp" onclick="togglePanel('mcp')"><span class="lf-tab-icon">🔌</span><span>MCP</span></div>
+            <div class="lf-tab" data-panel="settings" onclick="togglePanel('settings')"><span class="lf-tab-icon">⚙️</span><span>Config</span></div>
+        </div>
+    </div>
+    <div class="lf-edge lf-edge-bottom" id="edge-bottom">
+        <div class="lf-tabs lf-tabs-bottom">
+            <div class="lf-tab" data-panel="log" onclick="togglePanel('log')"><span class="lf-tab-icon">📜</span><span>Log</span></div>
+            <div class="lf-tab" data-panel="command" onclick="togglePanel('command')"><span class="lf-tab-icon">💬</span><span>Cmd</span></div>
+        </div>
+    </div>
+    <div class="lf-edge lf-edge-left" id="edge-left">
+        <div class="lf-tabs lf-tabs-left">
+            <div class="lf-tab" data-panel="history" onclick="togglePanel('history')"><span class="lf-tab-icon">📋</span><span>History</span></div>
+        </div>
+    </div>
+
+    <!-- Corners -->
+    <div class="lf-corner lf-corner-tl"></div>
+    <div class="lf-corner lf-corner-tr"></div>
+    <div class="lf-corner lf-corner-bl"></div>
+    <div class="lf-corner lf-corner-br"></div>
+
+    <!-- Status Pill -->
+    <div class="lf-status-pill" id="status-pill"></div>
+
+    <!-- ═══ Panels ═══ -->
+    <!-- Agent Panel (left) -->
+    <div class="lf-panel lf-panel-left" id="panel-agent">
+        <div class="lf-panel-header"><span>🤖 Agent Control</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-body">
+            <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Goal</div>
+            <textarea style="width:100%;height:60px;background:hsla(0,0%,8%,0.7);border:1px solid #2a2a3a;color:#ccc;border-radius:5px;padding:8px;font-family:inherit;font-size:11px;resize:vertical;outline:none;" placeholder="What should the agent do?"></textarea>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+                <button style="flex:1;padding:7px;background:hsla(210,70%,45%,0.7);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;letter-spacing:0.06em;">▶ RUN</button>
+                <button style="padding:7px 12px;background:hsla(0,60%,40%,0.6);color:#fcc;border:none;border-radius:5px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;">◼ STOP</button>
+            </div>
+            <div style="margin-top:14px;padding:10px;background:hsla(0,0%,100%,0.02);border-radius:5px;border:1px solid #1a1a2a;">
+                <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:0.1em;">Status</div>
+                <div style="margin-top:4px;font-size:11px;color:#888;">Ready — awaiting instructions</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Panel (right) -->
+    <div class="lf-panel lf-panel-right" id="panel-settings">
+        <div class="lf-panel-header"><span>⚙️ Settings</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-body">
+            <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Provider</div>
+            <select style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;">
+                <option>OLLAMA</option><option>LM STUDIO</option><option>GEMINI</option><option>OPENAI</option>
+            </select>
+            <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin:12px 0 4px;">Model</div>
+            <input style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;" value="llama3" />
+            <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin:12px 0 4px;">Base URL</div>
+            <input style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;" value="http://localhost:11434" />
+            <div style="display:flex;gap:6px;margin-top:12px;">
+                <button style="flex:1;padding:7px;background:hsla(140,50%,30%,0.6);color:#cfc;border:1px solid hsla(140,50%,40%,0.4);border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">🔍 DETECT</button>
+                <button style="flex:1;padding:7px;background:hsla(210,70%,45%,0.6);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">💾 SAVE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tools Panel (right) -->
+    <div class="lf-panel lf-panel-right" id="panel-tools">
+        <div class="lf-panel-header"><span>🧰 Tools</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-body">
+            <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">DOM Inspector</div>
+            <div style="display:flex;gap:6px;">
+                <button style="flex:1;padding:7px;background:hsla(0,0%,15%,0.8);border:1px solid #333;color:#aaa;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">🔍 Scan</button>
+                <button style="padding:7px 10px;background:hsla(0,0%,15%,0.8);border:1px solid #333;color:#aaa;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">🧹 Clear</button>
+            </div>
+            <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin:16px 0 6px;">Quick Actions</div>
+            <div style="display:flex;gap:6px;">
+                <button style="flex:1;padding:7px;background:hsla(0,0%,15%,0.8);border:1px solid #333;color:#aaa;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">⬆ Top</button>
+                <button style="flex:1;padding:7px;background:hsla(0,0%,15%,0.8);border:1px solid #333;color:#aaa;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">⬇ Bottom</button>
+                <button style="flex:1;padding:7px;background:hsla(0,0%,15%,0.8);border:1px solid #333;color:#aaa;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">📸 Snap</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MCP Panel (right) -->
+    <div class="lf-panel lf-panel-right" id="panel-mcp">
+        <div class="lf-panel-header"><span>🔌 MCP Servers</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-body">
+            <button style="width:100%;padding:7px;background:hsla(210,70%,45%,0.6);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;font-weight:600;">+ ADD SERVER</button>
+            <div style="text-align:center;padding:24px;color:#444;font-size:11px;margin-top:12px;">
+                <div style="font-size:24px;margin-bottom:6px;opacity:0.5;">🔌</div>
+                No MCP servers configured.<br>Add endpoints implementing the MCP spec.
+            </div>
+        </div>
+    </div>
+
+    <!-- Canvas Panel (right) -->
+    <div class="lf-panel lf-panel-right" id="panel-canvas">
+        <div class="lf-panel-header"><span>📱 Canvas SPAs</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-body">
+            <div style="text-align:center;padding:24px;color:#444;font-size:11px;">
+                <div style="font-size:24px;margin-bottom:6px;opacity:0.5;">📱</div>
+                No canvases saved yet.<br>Generated SPAs will appear here.
+            </div>
+        </div>
+    </div>
+
+    <!-- Workflows Panel (left) -->
+    <div class="lf-panel lf-panel-left" id="panel-workflows">
+        <div class="lf-panel-header"><span>🔄 Workflows</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-body">
+            <button style="width:100%;padding:7px;background:hsla(210,70%,45%,0.6);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;font-weight:600;">+ NEW WORKFLOW</button>
+            <div style="text-align:center;padding:24px;color:#444;font-size:11px;margin-top:12px;">
+                <div style="font-size:24px;margin-bottom:6px;opacity:0.5;">🔄</div>
+                Create multi-step automations<br>that chain agent actions.
+            </div>
+        </div>
+    </div>
+
+    <!-- History Panel (left) -->
+    <div class="lf-panel lf-panel-left" id="panel-history">
+        <div class="lf-panel-header"><span>📋 History</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-body">
+            <div style="text-align:center;padding:24px;color:#444;font-size:11px;">
+                <div style="font-size:24px;margin-bottom:6px;opacity:0.5;">📋</div>
+                Run history will appear here.
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Panel (bottom) -->
+    <div class="lf-panel lf-panel-bottom" id="panel-log">
+        <div class="lf-panel-header"><span>📜 Activity Log</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-body" id="log-body" style="font-size:11px;line-height:1.6;">
+            <div style="color:#51cf66;">[init] 🌊 Liquid Laser Frame initialized</div>
+            <div style="color:#aeb2b8;">[info] Ready — click the tabs protruding from the frame edges</div>
+        </div>
+    </div>
+
+    <!-- Command Panel (bottom) -->
+    <div class="lf-panel lf-panel-bottom" id="panel-command">
+        <div class="lf-panel-header"><span>💬 Quick Command</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-body">
+            <div style="display:flex;gap:6px;align-items:stretch;">
+                <textarea style="flex:1;min-height:44px;max-height:80px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;padding:8px;font-family:inherit;font-size:11px;resize:vertical;outline:none;" placeholder="Type a goal and press Enter..."></textarea>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    <button style="flex:1;padding:0 12px;background:hsla(210,70%,45%,0.7);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:12px;cursor:pointer;">▶</button>
+                    <button style="flex:1;padding:0 12px;background:hsla(0,60%,40%,0.6);color:#fcc;border:none;border-radius:5px;font-family:inherit;font-size:12px;cursor:pointer;">◼</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════ DEMO CONTROLS ════════════════ -->
+<div class="demo-content">
+    <div class="demo-title">Liquid Laser Frame</div>
+    <div class="demo-subtitle">The widget IS the border — interact with the glowing tabs on each edge</div>
+
+    <div class="state-grid">
+        <button class="state-btn active" data-state="idle" onclick="setState('idle')">🔵 Idle</button>
+        <button class="state-btn" data-state="thinking" onclick="setState('thinking')">🟡 Thinking</button>
+        <button class="state-btn" data-state="acting" onclick="setState('acting')">⚡ Acting</button>
+        <button class="state-btn" data-state="error" onclick="setState('error')">🔴 Error</button>
+        <button class="state-btn" data-state="success" onclick="setState('success')">🟢 Success</button>
+        <button class="state-btn" data-state="waiting" onclick="setState('waiting')">🟣 Waiting</button>
+    </div>
+
+    <div class="sim-section">
+        <button class="sim-btn" id="sim-btn" onclick="runSimulation()">▶ Simulate Agent Run</button>
+        <span class="sim-progress" id="sim-progress"></span>
+    </div>
+
+    <div class="demo-hint">Press Escape to close panels • Click tabs protruding from edges to open panels</div>
+
+    <div class="demo-note">
+        <strong>How it works:</strong> The entire UI lives in a 5px liquid-energy frame around the viewport.
+        Tabs protrude slightly inward from each edge — click them to slide out panels for
+        <strong>Agent Control</strong>, <strong>Workflows</strong>, <strong>Tools</strong>,
+        <strong>Canvas SPAs</strong>, <strong>MCP Servers</strong>, <strong>Settings</strong>,
+        <strong>Logs</strong>, and <strong>Quick Commands</strong>. The frame's color, speed, and pulse
+        pattern change with the agent's state — try the buttons above to see each state.<br><br>
+        <strong>In the real userscript</strong>, this frame wraps any webpage. The agent scans page elements,
+        thinks with your local LLM, and executes actions — all while the frame visually reflects every
+        state change in real-time.
+    </div>
+</div>
+
+<script>
+let activePanel = null;
+
+function setState(s) {
+    document.getElementById('lf-root').setAttribute('data-state', s);
+    document.querySelectorAll('.state-btn').forEach(b => b.classList.toggle('active', b.dataset.state === s));
+
+    const pill = document.getElementById('status-pill');
+    const labels = { idle: '', thinking: '⟳ Thinking...', acting: '⚡ Executing', error: '✖ Error', success: '✔ Complete', waiting: '◉ Awaiting' };
+    pill.textContent = labels[s] || '';
+    pill.classList.toggle('visible', s !== 'idle');
+
+    addLog(s === 'idle' ? 'info' : s === 'error' ? 'error' : s === 'success' ? 'success' : 'info',
+           `State → ${s.toUpperCase()}`);
+}
+
+function togglePanel(id) {
+    const panel = document.getElementById('panel-' + id);
+    if (!panel) return;
+
+    if (activePanel === id) {
+        closePanel();
+        return;
+    }
+
+    // Close all
+    document.querySelectorAll('.lf-panel').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.lf-tab').forEach(t => t.classList.remove('active'));
+
+    panel.classList.add('open');
+    const tab = document.querySelector(`.lf-tab[data-panel="${id}"]`);
+    if (tab) tab.classList.add('active');
+    activePanel = id;
+}
+
+function closePanel() {
+    document.querySelectorAll('.lf-panel').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.lf-tab').forEach(t => t.classList.remove('active'));
+    activePanel = null;
+}
+
+function addLog(type, msg) {
+    const body = document.getElementById('log-body');
+    if (!body) return;
+    const colors = { info: '#aeb2b8', error: '#ff6b6b', success: '#51cf66', thought: '#ffd43b' };
+    const ts = new Date().toLocaleTimeString('en', { hour12: false });
+    const el = document.createElement('div');
+    el.style.color = colors[type] || '#aeb2b8';
+    el.textContent = `[${ts}] ${msg}`;
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+}
+
+// Escape to close
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+
+// Simulation
+async function runSimulation() {
+    const btn = document.getElementById('sim-btn');
+    const prog = document.getElementById('sim-progress');
+    btn.disabled = true;
+
+    const steps = [
+        { state: 'thinking', msg: '🧠 Analyzing page elements...', ms: 1800 },
+        { state: 'thinking', msg: '💭 Planning next action...', ms: 1500 },
+        { state: 'acting',   msg: '🖱️ Clicking search button [id:7]', ms: 1200 },
+        { state: 'thinking', msg: '🧠 Evaluating result...', ms: 1600 },
+        { state: 'acting',   msg: '⌨️ Typing "liquid laser" into [id:12]', ms: 1400 },
+        { state: 'waiting',  msg: '⏳ Waiting for page load...', ms: 2000 },
+        { state: 'thinking', msg: '💭 Checking if goal is met...', ms: 1200 },
+        { state: 'success',  msg: '✅ Goal achieved!', ms: 2000 },
+        { state: 'idle',     msg: '🔄 Returning to idle', ms: 500 },
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        prog.textContent = `Step ${i + 1}/${steps.length}: ${s.msg.split(' ').slice(1, 4).join(' ')}...`;
+        setState(s.state);
+        addLog(s.state === 'error' ? 'error' : s.state === 'success' ? 'success' : s.state === 'thinking' ? 'thought' : 'info', s.msg);
+        await new Promise(r => setTimeout(r, s.ms));
+    }
+
+    prog.textContent = 'Simulation complete';
+    btn.disabled = false;
+    setTimeout(() => { prog.textContent = ''; }, 3000);
+}
+</script>
+</body>
+</html>
