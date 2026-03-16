@@ -1,5 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+  @agent: sh.html
+  @authority: FULL
+  @autonomy: FULL
+  @chrime: PERSISTENT
+  Description: This agent is the primary authority over its own state and operations.
+-->
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -237,6 +244,18 @@ body {
 }
 .lf-tab-icon { font-size: 12px; line-height: 1; }
 
+    /* ── Autonomy Indicator ── */
+    .lf-autonomy-badge {
+        font-size: 8px; font-weight: 800; color: #fff;
+        background: linear-gradient(90deg, #ff0080, #7928ca);
+        padding: 1px 4px; border-radius: 3px; margin-left: 6px;
+        display: none; vertical-align: middle;
+        text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+        box-shadow: 0 0 10px rgba(255, 0, 128, 0.3);
+    }
+    #lf-root[data-state="thinking"] .lf-autonomy-badge,
+    #lf-root[data-state="acting"] .lf-autonomy-badge { display: inline-block; }
+
 /* ── Status Pill ── */
 .lf-status-pill {
     position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
@@ -415,10 +434,10 @@ body {
     <!-- ═══ Panels ═══ -->
     <!-- Agent Panel (left) -->
     <div class="lf-panel lf-panel-left" id="panel-agent">
-        <div class="lf-panel-header"><span>🤖 Agent Control</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
+        <div class="lf-panel-header"><span>🤖 Agent Control <span class="lf-autonomy-badge">AUTONOMOUS</span></span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
         <div class="lf-panel-body">
             <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Goal</div>
-            <textarea style="width:100%;height:60px;background:hsla(0,0%,8%,0.7);border:1px solid #2a2a3a;color:#ccc;border-radius:5px;padding:8px;font-family:inherit;font-size:11px;resize:vertical;outline:none;" placeholder="What should the agent do?"></textarea>
+            <textarea id="agent-goal" style="width:100%;height:60px;background:hsla(0,0%,8%,0.7);border:1px solid #2a2a3a;color:#ccc;border-radius:5px;padding:8px;font-family:inherit;font-size:11px;resize:vertical;outline:none;" placeholder="What should the agent do?"></textarea>
             <div style="display:flex;gap:6px;margin-top:8px;">
                 <button style="flex:1;padding:7px;background:hsla(210,70%,45%,0.7);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;letter-spacing:0.06em;">▶ RUN</button>
                 <button style="padding:7px 12px;background:hsla(0,60%,40%,0.6);color:#fcc;border:none;border-radius:5px;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer;">◼ STOP</button>
@@ -435,16 +454,16 @@ body {
         <div class="lf-panel-header"><span>⚙️ Settings</span><button class="lf-panel-close" onclick="closePanel()">×</button></div>
         <div class="lf-panel-body">
             <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Provider</div>
-            <select style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;">
+            <select id="setting-provider" style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;">
                 <option>OLLAMA</option><option>LM STUDIO</option><option>GEMINI</option><option>OPENAI</option>
             </select>
             <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin:12px 0 4px;">Model</div>
-            <input style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;" value="llama3" />
+            <input id="setting-model" style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;" value="llama3" />
             <div style="font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.1em;margin:12px 0 4px;">Base URL</div>
-            <input style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;" value="http://localhost:11434" />
+            <input id="setting-base-url" style="width:100%;padding:6px;background:#111;border:1px solid #2a2a3a;color:#ccc;border-radius:5px;font-family:inherit;font-size:11px;" value="http://localhost:11434" />
             <div style="display:flex;gap:6px;margin-top:12px;">
                 <button style="flex:1;padding:7px;background:hsla(140,50%,30%,0.6);color:#cfc;border:1px solid hsla(140,50%,40%,0.4);border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">🔍 DETECT</button>
-                <button style="flex:1;padding:7px;background:hsla(210,70%,45%,0.6);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">💾 SAVE</button>
+                <button onclick="saveSettings()" style="flex:1;padding:7px;background:hsla(210,70%,45%,0.6);color:#fff;border:none;border-radius:5px;font-family:inherit;font-size:10px;cursor:pointer;">💾 SAVE</button>
             </div>
         </div>
     </div>
@@ -573,6 +592,45 @@ body {
 
 <script>
 let activePanel = null;
+
+// Chrime: Persistent State Manager
+const Chrime = {
+    load() {
+        const goal = localStorage.getItem('lf-agent-goal');
+        if (goal) document.getElementById('agent-goal').value = goal;
+
+        const provider = localStorage.getItem('lf-setting-provider');
+        if (provider) document.getElementById('setting-provider').value = provider;
+
+        const model = localStorage.getItem('lf-setting-model');
+        if (model) document.getElementById('setting-model').value = model;
+
+        const baseUrl = localStorage.getItem('lf-setting-base-url');
+        if (baseUrl) document.getElementById('setting-base-url').value = baseUrl;
+
+        addLog('info', 'Chrime synchronized: Persistent state loaded.');
+    },
+    save() {
+        localStorage.setItem('lf-agent-goal', document.getElementById('agent-goal').value);
+        localStorage.setItem('lf-setting-provider', document.getElementById('setting-provider').value);
+        localStorage.setItem('lf-setting-model', document.getElementById('setting-model').value);
+        localStorage.setItem('lf-setting-base-url', document.getElementById('setting-base-url').value);
+        addLog('success', 'Chrime updated: Persistent state saved.');
+    }
+};
+
+function saveSettings() {
+    Chrime.save();
+    closePanel();
+}
+
+// Auto-save goal on change
+document.addEventListener('DOMContentLoaded', () => {
+    Chrime.load();
+    document.getElementById('agent-goal').addEventListener('input', () => {
+        localStorage.setItem('lf-agent-goal', document.getElementById('agent-goal').value);
+    });
+});
 
 function setState(s) {
     document.getElementById('lf-root').setAttribute('data-state', s);
